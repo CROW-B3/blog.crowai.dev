@@ -1,0 +1,196 @@
+---
+title: 'Why We Chose Multi-Repo Over Monorepo: Managing 34 Git Repositories'
+description: 'A practical guide to multi-repo architecture - when to split repositories, naming conventions, template repos for consistency, and tooling to manage it all at scale.'
+date: 2026-01-08
+image: './banner.jpg'
+tags: ['architecture', 'git', 'multi-repo', 'developer-experience', 'microservices']
+authors: ['ranuga-disansa']
+---
+
+Everyone tells you monorepos are the way. Turborepo, Nx, single source of truth, atomic commits across packages. We've heard the pitch.
+
+We went multi-repo anyway. 34 repositories and counting.
+
+Here's why, and how we make it work.
+
+## The Monorepo vs Multi-Repo Decision
+
+Let's be clear: monorepos are great. For the right team. The right codebase. The right tooling budget.
+
+But monorepos come with baggage:
+
+- **CI complexity**: Every PR potentially triggers every test suite
+- **Permissions headache**: GitHub doesn't do per-folder permissions well
+- **Tooling lock-in**: You're betting on Turborepo/Nx staying maintained and fitting your needs
+- **The "big ball of mud" risk**: Easy to create hidden dependencies when everything's in one place
+
+Our situation:
+
+- 9 core backend services with different deployment cycles
+- 3 frontend clients with completely different tech stacks
+- SDKs that get published to npm
+- Infrastructure configs that should be separate for security
+- Templates that people clone and modify
+- Team members working on isolated pieces
+
+Multi-repo made more sense.
+
+## The Naming Convention
+
+The first thing that makes multi-repo manageable: **consistent naming**.
+
+```
+core-*          → Core backend services
+bff-*           → Backend-for-frontend services
+*-client        → Frontend applications
+*-service       → Backend services
+*-sdk / *-kit   → Published packages
+*-template      → Starter templates
+```
+
+Our actual repos:
+
+| Category | Repositories |
+|----------|-------------|
+| **Core Services** | `core-api-gateway`, `core-auth-service`, `core-user-service`, `core-product-service`, `core-interaction-service`, `core-pattern-service`, `core-analytics-service`, `core-notification-service`, `core-organization-service` |
+| **Supporting Services** | `bff-chat-service`, `mcp-service`, `a2a-service`, `web-ingest-service` |
+| **Clients** | `dashboard-client`, `landing-client`, `auth-client`, `rogue-store` |
+| **SDKs** | `website-hook-sdk`, `ui-kit` |
+| **Infrastructure** | `infrastructure`, `local-dev` |
+| **Templates** | `npm-sdk-template`, `cloudflare-workers-containers-hono-template`, `cloudflare-opennext-nextjs-template`, + more |
+
+When someone says "I'm working on core-auth-service", everyone knows it's a core backend service handling authentication. No ambiguity.
+
+## Template Repositories
+
+Here's what actually keeps 34 repos consistent: **templates**.
+
+We have starter templates for every type of repo we create:
+
+### `npm-sdk-template`
+
+Every SDK we publish starts here. Includes:
+- TypeScript config with strict mode
+- Biome for linting/formatting
+- Vitest for testing
+- GitHub Actions for CI/CD and npm publishing
+- Changesets for versioning
+
+When we created `website-hook-sdk` and `ui-kit`, we didn't set up tooling from scratch. Clone the template, rename things, start coding.
+
+### `cloudflare-workers-containers-hono-template`
+
+Every backend service starts here. Includes:
+- Hono framework setup
+- Cloudflare Workers config
+- D1/R2/KV binding patterns
+- Docker setup for Workers Containers
+- Health check endpoints
+- Structured logging
+
+We have similar templates for:
+- Next.js frontends (`cloudflare-opennext-nextjs-template`)
+- Python services (`cloudflare-workers-containers-python-template`)
+- Go services (`cloudflare-workers-containers-go-template`)
+
+### Why Templates Beat Shared Configs
+
+The alternative is shared config packages - `@org/eslint-config`, `@org/tsconfig`, etc.
+
+Problems with that approach:
+- Version mismatches across repos
+- Breaking changes propagate everywhere
+- Another dependency to maintain
+- Repos become tightly coupled
+
+Templates are different. You copy once, then the repo owns its config. Want to diverge for a specific project? Go ahead. No coordination needed.
+
+The trade-off: updates don't propagate automatically. But in practice, we found that's fine. Not every repo needs the latest config. And when they do, it's a conscious decision.
+
+## Git Operations at Scale
+
+34 repos means git operations get tedious. We built tooling.
+
+### The `local-dev` Tool
+
+Thilina wrote about this in detail, but the short version:
+
+```bash
+bun run clone    # Clone 22 default repos, install deps
+bun run sync     # Pull latest on all repos
+```
+
+Categorized repos so you only clone what you need. Smart package manager detection. Safety rails on sync so you don't blow away uncommitted work.
+
+## What We Gave Up
+
+Being honest about the trade-offs:
+
+**Cross-repo refactoring is painful.** Renaming a shared type means PRs in multiple repos. We accept this because cross-cutting changes are rare for us.
+
+**No atomic commits.** Can't commit changes to the SDK and the service that uses it in one commit. We use versioning and careful coordination instead.
+
+**Dependency management is manual.** When `ui-kit` releases a new version, each consuming repo updates separately. We haven't automated this yet.
+
+**Discovery is harder.** New team members need to understand which repos exist and how they relate. Documentation and naming conventions help, but there's still a learning curve.
+
+## What We Gained
+
+**Independent deployments.** Each service deploys on its own schedule. No coordination needed for unrelated changes.
+
+**Clear ownership.** Each repo has clear boundaries. You know what you're responsible for.
+
+**Isolated failures.** A broken CI in one repo doesn't block everyone else.
+
+**Simpler permissions.** Different access levels for infrastructure vs. application code. Public SDKs vs. private services.
+
+**Flexible tech choices.** Frontend repos use different tooling than backend repos. No forcing everything into one build system.
+
+## When to Split vs. Keep Together
+
+Our rules of thumb:
+
+**Split when:**
+- Different deployment targets (npm package vs. deployed service)
+- Different access requirements (public vs. private)
+- Different teams/owners
+- Genuinely independent lifecycles
+
+**Keep together when:**
+- Tight coupling (changes usually span both)
+- Same deployment target
+- Same team working on both
+- Shared test fixtures
+
+We've merged repos back together twice when we realized the split was premature. That's fine. Architecture evolves.
+
+## The Tooling That Makes It Work
+
+Summary of what we use:
+
+| Need | Solution |
+|------|----------|
+| Clone/sync all repos | `local-dev` CLI tool |
+| Consistent new repos | Template repositories |
+| CI/CD | GitHub Actions (per-repo) |
+| Fast CI | Blacksmith runners |
+| Package management | Bun (migrating from pnpm) |
+| Linting/formatting | Biome (per-repo config) |
+
+## Conclusion
+
+Multi-repo isn't for everyone. If you have a small team working on tightly coupled code, a monorepo is probably simpler.
+
+But if you have:
+- Multiple deployment targets
+- Different access requirements
+- Independent service lifecycles
+- A team that values clear boundaries
+
+Multi-repo can work. The key is investing in tooling and conventions upfront. Template repos. Naming standards. Clone/sync scripts. Without those, 34 repos would be chaos.
+
+With them, it's manageable. Actually, it's kind of nice.
+
+---
+
+*Questions about multi-repo architecture? We're happy to chat - open an issue on any of our repos.*
