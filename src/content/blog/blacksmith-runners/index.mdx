@@ -1,0 +1,53 @@
+---
+title: 'Switching to Blacksmith for Faster CI'
+description: 'Why we moved our GitHub Actions to Blacksmith runners - and why the timing made sense.'
+date: 2026-01-08
+image: './banner.jpg'
+tags: ['ci-cd', 'github-actions', 'devops', 'blacksmith']
+authors: ['tharun-randiv']
+---
+
+We recently started moving our GitHub Actions workflows to [Blacksmith](https://www.blacksmith.sh/) runners. Faster builds, cheaper costs, and some upcoming GitHub pricing changes made it an easy call.
+
+## Why Blacksmith?
+
+Two reasons: speed and cost.
+
+[Blacksmith runs on high-performance CPUs](https://www.ycombinator.com/companies/blacksmith) optimized for CI workloads - about 50% better single-core performance than GitHub's standard runners. For stuff like Node.js builds and tests, that translates to noticeably faster runs.
+
+The pricing is also better: **$0.004/minute vs GitHub's $0.008/minute**. Half the cost for faster builds.
+
+## The GitHub Pricing Change
+
+This is partly why we moved now. GitHub [announced](https://www.blacksmith.sh/blog/actions-pricing) they're adding a **$0.002/minute platform fee** for all Actions usage starting March 2026 - even if you're using external runners. So the economics of third-party runners like Blacksmith still work out, but the gap is narrowing.
+
+Made sense to switch while we were already thinking about it.
+
+## What Changed
+
+The migration is pretty simple - just swap `runs-on`:
+
+```yaml
+# Before
+runs-on: ubuntu-latest
+
+# After
+runs-on: blacksmith-2vcpu-ubuntu-2204
+```
+
+Our Docker builds especially benefit from this. Blacksmith persists Docker layer caches across runs, so unchanged layers don't rebuild. What used to take minutes now takes seconds.
+
+## Where We're At
+
+We've moved our main workflows over:
+- Docker builds (way faster with cached layers)
+- Playwright tests
+- Deploy pipelines
+
+Still early days, but the speed difference is noticeable and our CI bills are lower. Worth the small migration effort.
+
+---
+
+*Related:*
+- [Blacksmith](https://www.blacksmith.sh/)
+- [GitHub Actions Pricing Changes](https://www.blacksmith.sh/blog/actions-pricing)
