@@ -19,16 +19,12 @@ export const NAV_LINKS: SocialLink[] = [
 
 export const SOCIAL_LINKS: SocialLink[] = [
   {
-    href: 'https://github.com/Programmer-RD-AI',
+    href: 'https://github.com/CROW-B3',
     label: 'GitHub',
   },
   {
     href: 'https://www.linkedin.com/in/programmer-rd-ai/',
     label: 'LinkedIn',
-  },
-  {
-    href: 'mailto:go2ranuga@gmail.com',
-    label: 'Email',
   },
   {
     href: '/rss.xml',
