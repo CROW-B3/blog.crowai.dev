@@ -14,7 +14,9 @@
 
   async function renderMermaidDiagrams() {
     // Find all code blocks with language "mermaid"
-    const mermaidBlocks = document.querySelectorAll('pre code.language-mermaid, code.language-mermaid')
+    const mermaidBlocks = document.querySelectorAll(
+      'pre code.language-mermaid, code.language-mermaid',
+    )
 
     for (const block of mermaidBlocks) {
       const pre = block.closest('pre') || block.parentElement
@@ -28,7 +30,10 @@
       container.className = 'mermaid-diagram'
 
       try {
-        const { svg } = await mermaid.render(`mermaid-${Math.random().toString(36).substring(2, 11)}`, code)
+        const { svg } = await mermaid.render(
+          `mermaid-${Math.random().toString(36).substring(2, 11)}`,
+          code,
+        )
         container.innerHTML = svg
         pre.replaceWith(container)
       } catch (e) {
@@ -62,7 +67,7 @@
   }
 
   /* Dark mode support */
-  [data-theme="dark"] .mermaid-diagram {
+  [data-theme='dark'] .mermaid-diagram {
     filter: invert(93%) hue-rotate(180deg);
   }
 </style>
