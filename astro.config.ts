@@ -3,6 +3,7 @@ import { defineConfig } from 'astro/config'
 import mdx from '@astrojs/mdx'
 import react from '@astrojs/react'
 import sitemap from '@astrojs/sitemap'
+import mermaid from 'astro-mermaid'
 import icon from 'astro-icon'
 
 import { rehypeHeadingIds } from '@astrojs/markdown-remark'
@@ -21,6 +22,10 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   site: 'https://blog.crowai.dev/',
   integrations: [
+    mermaid({
+      theme: 'default',
+      autoTheme: true,
+    }),
     expressiveCode({
       themes: ['github-light', 'github-dark'],
       plugins: [pluginCollapsibleSections(), pluginLineNumbers()],
