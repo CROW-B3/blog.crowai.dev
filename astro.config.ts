@@ -6,6 +6,7 @@ import sitemap from '@astrojs/sitemap'
 import icon from 'astro-icon'
 
 import { rehypeHeadingIds } from '@astrojs/markdown-remark'
+import { rehypeMermaid } from '@beoe/rehype-mermaid'
 import expressiveCode from 'astro-expressive-code'
 import rehypeExternalLinks from 'rehype-external-links'
 import rehypeKatex from 'rehype-katex'
@@ -97,6 +98,12 @@ export default defineConfig({
             light: 'github-light',
             dark: 'github-dark',
           },
+        },
+      ],
+      [
+        rehypeMermaid,
+        {
+          strategy: 'img-svg',
         },
       ],
     ],
