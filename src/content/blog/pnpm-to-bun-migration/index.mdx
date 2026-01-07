@@ -1,0 +1,37 @@
+---
+title: 'Why We Moved from pnpm to Bun'
+description: 'A quick look at why we switched package managers and where we still hit some bumps.'
+date: 2026-01-08
+image: './banner.jpg'
+tags: ['bun', 'pnpm', 'tooling', 'dx']
+authors: ['thanuka-wickramasinghe']
+---
+
+We've been moving our repos from pnpm to Bun. Nothing dramatic - just wanted faster installs and snappier local dev.
+
+## Why Bun?
+
+Speed, basically. pnpm was already fast, but Bun just *feels* quicker. Cold installs, running scripts, all of it.
+
+We're using it as a package manager for now - our production stuff still runs on Node/Cloudflare Workers. But with [Anthropic acquiring Bun](https://bun.com/blog/bun-joins-anthropic) in December 2025, we're pretty optimistic about where it's headed. The goal is to eventually run on the Bun runtime itself once the ecosystem catches up.
+
+## Where We're At
+
+Most of our frontend repos have moved over:
+- `landing-client` ✓
+- `dashboard-client` ✓
+- `rogue-store` ✓
+
+But some repos are still on pnpm. Our blog (`blog.crowai.dev`) and `website-hook-sdk` ran into random compatibility issues that weren't worth debugging. Nothing major, just annoying enough that we left them for now.
+
+## Looking Forward
+
+Bun hit 7.2 million monthly downloads late last year and it's still growing fast. With Anthropic behind it now - Claude Code literally ships as a Bun executable - we're betting it becomes a big part of how JavaScript development works going forward.
+
+For now we're just using it as a package manager. But we're keeping an eye on it and will keep moving things over as support improves.
+
+---
+
+*Related:*
+- [Bun is joining Anthropic](https://bun.com/blog/bun-joins-anthropic)
+- [Anthropic acquires Bun - DevClass](https://devclass.com/2025/12/03/bun-javascript-runtime-acquired-by-anthropic-tying-its-future-to-ai-coding/)
