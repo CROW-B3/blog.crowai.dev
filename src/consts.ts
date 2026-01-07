@@ -23,7 +23,7 @@ export const SOCIAL_LINKS: SocialLink[] = [
     label: 'GitHub',
   },
   {
-    href: 'https://www.linkedin.com/in/programmer-rd-ai/',
+    href: 'https://www.linkedin.com/company/crow-b3/',
     label: 'LinkedIn',
   },
   {
