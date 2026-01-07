@@ -1,10 +1,10 @@
 import type { IconMap, SocialLink, Site } from '@/types'
 
 export const SITE: Site = {
-  title: 'blog.prdai.dev',
-  description: "just a guy's thoughts on tech",
-  href: 'https://blog.prdai.dev/',
-  author: 'prdai',
+  title: 'blog.crowai.dev',
+  description: 'The CROW Enginnering Blog',
+  href: 'https://blog.crowai.dev/',
+  author: 'The CROW Team',
   locale: 'en-US',
   featuredPostCount: 2,
   postsPerPage: 3,

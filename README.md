@@ -1,3 +1,3 @@
-# blog.prdai.dev
+# blog.crowai.dev
 
-just a guy's thoughts on tech
+The CROW Enginnering Blog
