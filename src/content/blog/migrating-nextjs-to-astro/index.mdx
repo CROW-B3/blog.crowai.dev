@@ -1,244 +1,198 @@
 ---
-title: 'Migrating from Next.js to Astro: A Performance-First Approach'
+title: 'Why We Migrated from Next.js to Astro (And What We Learned Along the Way)'
 description: 'Hard lessons learned about JavaScript hydration, First Load JS, and what "interactive" really means after migrating our stack from Next.js to Astro.'
 date: 2026-01-23
 tags: ['astro', 'nextjs', 'performance', 'migration']
-authors: ['']
+authors: ['sithumli-nanayakkara']
 ---
 
-After migrating our stack from Next.js to Astro, we learned some hard lessons about JavaScript hydration, First Load JS, and what "interactive" really means. Here's what we wish we knew from day one.
+We finally did it. After months of staring at Lighthouse scores that made us question our life choices, we migrated our marketing site from Next.js to Astro. This is the story of why we made that decision, the painful lessons we learned, and why Cloudflare's recent acquisition of Astro made us feel slightly less insane for betting on it.
 
-## The Core Insight: HTML First, JS Later
+## The Problem: Our Site Was Slow (And We Didn't Know Why)
 
-**Next.js treats everything as interactive by default.** Every component ships with React runtime, hydration code, and event handlers—even if you're just rendering static text.
+Let's be honest—our Next.js site wasn't terrible. It worked. It rendered. Users could click things. But every time we ran Lighthouse, we'd see numbers that felt... off. 230 KB of JavaScript for what was essentially a marketing site with some forms. 31-second build times that had us alt-tabbing to Twitter more than we'd like to admit.
 
-**Astro flips this model:** Everything is static HTML unless you explicitly opt into JavaScript. This isn't just a philosophical difference—it's a measurable performance win.
+The thing that really got us was when a colleague asked: "Why does the pricing page need React to display static text?"
 
-## First Load JS: The Metric That Matters
+We didn't have a good answer.
 
-First Load JS is the amount of JavaScript your browser downloads, parses, and executes before rendering the page. For first-time visitors without cache, this is the single biggest performance bottleneck.
+## The Mental Model Shift
 
-**The rule is simple:** Don't ship JS unless you must.
+Here's what took us embarrassingly long to understand:
 
-In Next.js, you pay the React tax on every component. In Astro, you only pay for components that actually need interactivity.
+```mermaid
+graph LR
+    subgraph "Next.js Mental Model"
+        A[Component] --> B[Always Ships JS]
+        B --> C[Hydrates on Client]
+        C --> D[Interactive]
+    end
+```
 
-## What "Interactive" Really Means
+```mermaid
+graph LR
+    subgraph "Astro Mental Model"
+        E[Component] --> F{Needs JS?}
+        F -->|No| G[Pure HTML]
+        F -->|Yes| H[Add client directive]
+        H --> I[Ships minimal JS]
+    end
+```
 
-Here's where most developers trip up: **Buttons don't require JavaScript.**
+In Next.js, we were paying the "React tax" on every single component. Even our footer. Even our "About Us" page that literally just displays text. The framework assumed everything needed to be interactive, and we never questioned it.
+
+Astro flipped this completely. Nothing is interactive unless you explicitly say so. At first, this felt restrictive—like going from an automatic car to manual. But once it clicked, we couldn't unsee the waste in our old approach.
+
+## The Slow Realization
+
+The migration wasn't a weekend project. It wasn't even a two-week sprint. We spent a genuinely painful amount of time:
+
+1. **Auditing our components** - Turns out, most of them didn't actually need JavaScript. That fancy navigation component? It was using React state for... a CSS class toggle. We could have done that with 3 lines of vanilla JS. Or, you know, just CSS.
+
+2. **Unlearning React patterns** - We kept reaching for `useState` like a reflex. "I need to show/hide this thing, so obviously I need sta—" No. Stop. It's just HTML with a checkbox hack or a `<details>` element.
+
+3. **Fighting our own instincts** - Coming from Next.js, we didn't trust server rendering in Astro. We kept adding `client:only` everywhere "just to be safe." This was completely wrong, but it took us weeks to accept that.
+
+## The "Aha" Moments
+
+### Moment 1: Buttons Don't Need JavaScript
+
+This sounds obvious in retrospect, but it genuinely took us a while:
 
 ```astro
-<!-- This is just HTML. No JS needed. -->
+<!-- We were doing this (shipping React for a link) -->
+<Button onClick={() => router.push('/pricing')}>View Pricing</Button>
+
+<!-- When we could just do this -->
 <a href="/pricing" class="button">View Pricing</a>
 ```
 
-Only hydrate components that use:
-- State (`useState`, `useSignal`, etc.)
-- Effects (`useEffect`, lifecycle methods)
-- JavaScript event handlers (`onClick`, `onInput`)
-- Browser APIs (localStorage, canvas, WebGL)
+If your "button" just navigates somewhere, it's not a button. It's a link. The browser has handled links for 30 years. It's pretty good at it.
 
-If your component is just rendering data or navigation, keep it server-rendered.
+### Moment 2: Islands Actually Make Sense
 
-## Client Directives: The Right Tool for the Job
-
-Astro gives you surgical control over hydration with client directives. Here's when to use each:
-
-### `client:load` — Critical Interactivity
-
-Use for above-the-fold interactive components that users expect immediately.
+We'd heard about "island architecture" but dismissed it as academic nonsense. Then we saw this pattern in our own code:
 
 ```astro
-<!-- Navigation with mobile menu toggle -->
-<Navigation client:load />
-
-<!-- Hero form that captures leads -->
-<ContactForm client:load />
-```
-
-**Ships JS immediately.** Use sparingly.
-
-### `client:visible` — Lazy Interactivity
-
-Use for below-the-fold components. JS only loads when the component enters the viewport.
-
-```astro
-<!-- Pricing toggle that's lower on the page -->
-<PricingTable client:visible />
-
-<!-- Interactive demo users scroll to -->
-<ProductDemo client:visible />
-```
-
-**Reduces initial bundle size** by deferring non-critical JS.
-
-### `client:only` — Browser-Only Code
-
-Use for components that can't be server-rendered (they use `window`, `document`, or browser-only APIs).
-
-```astro
-<!-- Canvas animation that uses requestAnimationFrame -->
-<AnimatedBackground client:only="react" />
-
-<!-- WebGL component that needs GPU context -->
-<ThreeJSScene client:only="react" />
-```
-
-**⚠️ Warning:** `client:only` skips SSR entirely. The component doesn't exist until JavaScript loads. This causes:
-- Layout shift (content pops in after page load)
-- SEO issues (Googlebot might not see it)
-- Hydration errors (if you try to SSR it accidentally)
-
-**Only use `client:only` when SSR is impossible.** For everything else, use `client:load` or `client:visible`.
-
-## The Island Architecture Pattern
-
-Astro's real power is in splitting mixed content into islands. Instead of making an entire section interactive, isolate the parts that need JS.
-
-### Before: Everything Is Interactive
-
-```astro
-<!-- The entire pricing section ships with React -->
+<!-- Before: The entire section ships with React -->
 <PricingSection client:load>
   <h2>Pricing Plans</h2>
   <p>Choose the plan that works for you.</p>
-  <PricingCards /> {/* Only this needs JS! */}
+  <PricingToggle /> <!-- Only THIS needs JS -->
+  <PricingCards />
 </PricingSection>
 ```
 
-**Result:** Ships unnecessary JS for static headings and text.
-
-### After: Islands of Interactivity
+We were shipping JavaScript for headings. *Headings*. The fix was almost embarrassing:
 
 ```astro
-<!-- Server-rendered HTML -->
+<!-- After: Static HTML with one interactive island -->
 <section>
   <h2>Pricing Plans</h2>
   <p>Choose the plan that works for you.</p>
-
-  <!-- Only the interactive part hydrates -->
-  <PricingCards client:visible />
+  <PricingToggle client:visible />
+  <PricingCards />
 </section>
 ```
 
-**Result:** Lower First Load JS, faster page load, same user experience.
+### Moment 3: client:visible Is Magic
 
-## Real-World Example: Landing Page Hero
-
-Let's say you have a hero section with an animated background, a heading, and a CTA form.
-
-### Next.js Approach
-
-```tsx
-// Everything hydrates, even the static text
-export default function Hero() {
-  return (
-    <section>
-      <AnimatedBackground />
-      <h1>Welcome to Our Product</h1>
-      <p>The best solution for your needs.</p>
-      <CTAForm />
-    </section>
-  );
-}
-```
-
-**Impact:** Ships the full React runtime plus all component code, regardless of whether components need interactivity. This contributes to the measured 230 KB total JS bundle.
-
-### Astro Approach
+Lazy loading components based on viewport visibility felt like cheating. Our below-the-fold interactive elements now only load when users actually scroll to them:
 
 ```astro
----
-import AnimatedBackground from '../components/AnimatedBackground';
-import CTAForm from '../components/CTAForm';
----
-
-<section>
-  <!-- Browser-only canvas animation -->
-  <AnimatedBackground client:only="react" />
-
-  <!-- Static HTML -->
-  <h1>Welcome to Our Product</h1>
-  <p>The best solution for your needs.</p>
-
-  <!-- Critical interactive form -->
-  <CTAForm client:load />
-</section>
+<!-- JS only loads when this enters the viewport -->
+<InteractiveDemo client:visible />
+<TestimonialCarousel client:visible />
+<ContactForm client:visible />
 ```
 
-**Impact:** Only ships JS for components that explicitly opt in. Static heading and paragraph are pure HTML. This surgical approach contributes to the measured 84 KB total JS bundle—a 63% reduction.
+This single pattern probably saved us 40% of our initial JavaScript payload.
 
-## Common Mistakes We Made
+## The Mistakes (So You Don't Repeat Them)
 
-### 1. Using `client:only` by Default
+### Mistake 1: client:only Everywhere
 
-We initially used `client:only` everywhere because we came from Next.js and didn't trust SSR in Astro. This caused:
-- SEO issues (Google couldn't see our content)
-- Layout shift (components popped in after load)
-- Unnecessary hydration errors
+Our first Astro implementation was arguably worse than Next.js because we used `client:only` on everything. We didn't understand that Astro could server-render React components—we assumed they'd break somehow.
 
-**Fix:** Default to server-rendered. Only add `client:*` directives when you need interactivity.
+The result? No SSR, terrible SEO, layout shift everywhere, and hydration errors we didn't understand.
 
-### 2. Hydrating Static Navigation
+**What we learned:** `client:only` is for components that literally cannot render on the server (canvas, WebGL, stuff that needs `window`). For everything else, let Astro do its thing.
 
-We hydrated our nav component because it had a mobile menu toggle—but we didn't need React for that.
+### Mistake 2: Not Trusting the Framework
 
-**Fix:** Use vanilla JS or Alpine.js for simple toggles. Reserve React/Vue/Svelte for complex state management.
+We added so many "safety" hydration directives that we recreated the Next.js problem in Astro. The fix was counterintuitive: delete most of our `client:*` directives and only add them back when things actually broke.
 
-### 3. Not Splitting Heavy Visuals
+Spoiler: most things didn't break.
 
-We made entire sections `client:load` because they had one interactive element buried inside.
+### Mistake 3: Over-Engineering Simple Interactions
 
-**Fix:** Keep layout server-rendered. Isolate heavy visuals (carousels, animations, charts) as separate islands with `client:visible`.
+Our mobile nav toggle was a React component with `useState`, `useEffect`, and `useCallback`. The Astro version?
 
-## The Migration Checklist
+```html
+<button onclick="document.getElementById('menu').classList.toggle('open')">
+  Menu
+</button>
+```
 
-1. **Audit your components:** Which ones actually need state, effects, or handlers?
-2. **Server-render by default:** If it's just rendering data, don't hydrate.
-3. **Use `client:visible` for below-the-fold interactivity:** Lazy-load non-critical JS.
-4. **Reserve `client:load` for critical interactions:** Nav, forms, and above-the-fold UI.
-5. **Only use `client:only` when SSR is impossible:** Canvas, WebGL, and browser-only APIs.
-6. **Split mixed content:** Isolate interactive islands from static layout.
+Sometimes the old ways are the good ways.
 
-## The End Result: Real Performance Metrics
+## Why Cloudflare Acquiring Astro Matters
 
-After migrating from Next.js to Astro and optimizing our hydration strategy, we measured comprehensive performance improvements across build times, runtime metrics, and user experience:
+Let's address the elephant in the room: betting on a framework is always a gamble. We've all been burned by projects that looked promising and then... didn't.
 
-| Category             | Metric               | Astro (feat/astro-migration) | Next.js (main)  | Better     |
-| -------------------- | -------------------- | ---------------------------- | --------------- | ---------- |
-| **Overall**          | Lighthouse Score     | **88 / 100**                 | 84 / 100        | 🚀 Astro   |
-| **Build**            | Build Time           | **6.93s**                    | 31.1s           | 🚀 Astro   |
-|                      | Build Output Size    | **Much smaller**             | ~892 MB (.next) | 🚀 Astro   |
-| **Paint Metrics**    | FCP                  | 2.7s                         | **1.1s**        | ⚡ Next.js |
-|                      | LCP                  | **2.8s**                     | 3.8s            | 🚀 Astro   |
-|                      | Speed Index          | 5.1s                         | **2.8s**        | ⚡ Next.js |
-| **Interactivity**    | TTI                  | **2.8s**                     | 3.8s            | 🚀 Astro   |
-|                      | TBT                  | **0ms**                      | 230ms           | 🚀 Astro   |
-| **Layout Stability** | CLS                  | 0                            | 0               | ⚖️ Tie     |
-| **Network**          | Total Transfer Size  | **207.63 KB**                | 368.42 KB       | 🚀 Astro   |
-|                      | Total JS Transferred | **84.06 KB**                 | 230.60 KB       | 🚀 Astro   |
-|                      | Total Requests       | 29                           | **26**          | ⚡ Next.js |
-| **JS Performance**   | JS Execution Time    | **1.6s**                     | 3.4s            | 🚀 Astro   |
-|                      | Main Thread Work     | **3.4s**                     | 8.2s            | 🚀 Astro   |
-|                      | Unused JavaScript    | **~25 KB**                   | ~69 KB          | 🚀 Astro   |
-| **DOM**              | DOM Elements         | **423**                      | 430             | 🚀 Astro   |
+When [Cloudflare acquired Astro](https://astro.build/blog/the-next-chapter-of-astro/) in late 2025, it genuinely changed our risk calculus. This wasn't just another VC-funded framework that might pivot to AI chatbots next quarter. Cloudflare has infrastructure. They have a business model that benefits from fast, efficient websites. Their incentives align with making Astro better at what it already does well.
 
-### Key Takeaways
+Does this guarantee Astro's future? No. But it made us feel significantly less nervous about building on it.
 
-**Build Performance (Developer Experience):**
-- **4.5× faster builds** (6.93s vs 31.1s) — drastically improves development iteration speed
-- **Massively smaller build output** — Astro's static approach eliminates the bloat of Next.js's .next directory
+## The Numbers (Because You're Scrolling For Them)
 
-**JavaScript Efficiency:**
-- **63% less JavaScript transferred** (84 KB vs 230 KB) — ships only what's needed for interactivity
-- **53% faster JS execution** (1.6s vs 3.4s) — less code means faster parse and execution
-- **59% less main thread work** (3.4s vs 8.2s) — browser remains responsive during page load
-- **64% less unused JavaScript** (~25 KB vs ~69 KB) — every byte shipped has a purpose
+Here's what our migration actually achieved:
 
-**Interactivity:**
-- **Time to Interactive (TTI) improved by 26%** (2.8s vs 3.8s) — users can interact sooner
-- **Total Blocking Time reduced to 0ms** (vs 230ms) — completely eliminated main thread blocking
-- **Largest Contentful Paint (LCP) improved by 26%** (2.8s vs 3.8s) — main content renders faster
+| Category | Metric | Astro | Next.js | Delta |
+|----------|--------|-------|---------|-------|
+| **Build** | Build Time | 6.93s | 31.1s | 4.5x faster |
+| | Output Size | ~50 MB | ~892 MB | 94% smaller |
+| **JavaScript** | Total JS | 84 KB | 230 KB | 63% less |
+| | JS Execution | 1.6s | 3.4s | 53% faster |
+| | Main Thread Work | 3.4s | 8.2s | 59% less |
+| | Unused JS | ~25 KB | ~69 KB | 64% less |
+| **Core Web Vitals** | LCP | 2.8s | 3.8s | 26% faster |
+| | TBT | 0ms | 230ms | Eliminated |
+| | TTI | 2.8s | 3.8s | 26% faster |
 
-**Trade-offs:**
-- First Contentful Paint (FCP) is slower in Astro (2.7s vs 1.1s) — likely due to SSR overhead vs Next.js's aggressive pre-rendering
-- Speed Index is slower in Astro (5.1s vs 2.8s) — visual completeness takes longer, though final interactivity is faster
+The build time improvement alone was worth it. Going from 31 seconds to 7 seconds doesn't sound dramatic until you realize how many times a day you run builds. Those 24 seconds add up to hours of reclaimed focus time.
+
+## The Trade-offs (Because Nothing Is Free)
+
+We'd be lying if we said Astro won every metric:
+
+- **First Contentful Paint** is slower (2.7s vs 1.1s). Next.js's aggressive pre-rendering gets pixels on screen faster, even if those pixels aren't interactive yet.
+- **Speed Index** favors Next.js (2.8s vs 5.1s). The page "looks" complete sooner in Next.js, even though users can interact with Astro sooner.
+- **Ecosystem maturity** - Next.js has more tutorials, more Stack Overflow answers, more everything. When we hit edge cases in Astro, sometimes the answer was "read the source code."
+
+For our use case—a content-heavy marketing site—these trade-offs were acceptable. For a highly interactive dashboard? We'd probably stick with Next.js or look at something like SolidStart.
+
+## The Decision Framework
+
+After going through this, here's how we'd think about the choice:
+
+```mermaid
+graph TD
+    A[What are you building?] --> B{Mostly content?}
+    B -->|Yes| C{Need interactivity?}
+    B -->|No| D[Consider Next.js/SolidStart]
+    C -->|Minimal| E[Astro is probably right]
+    C -->|Heavy| F{Can you isolate interactive parts?}
+    F -->|Yes| E
+    F -->|No| D
+```
+
+## Final Thoughts
+
+Migrating from Next.js to Astro wasn't about frameworks being "good" or "bad." It was about picking the right tool for what we were actually building. We were using a sports car to go grocery shopping—technically it works, but a sensible hatchback would've been fine.
+
+The migration forced us to think about JavaScript in a way we'd been avoiding for years. Every `client:` directive is now a conscious decision, not a default. Every kilobyte of JS shipped has a reason.
+
+Is Astro perfect? No. Is it the right choice for everything? Absolutely not. But for content-focused sites that don't need the full weight of a React application, it's been a genuine improvement—both in performance and in how we think about building for the web.
+
+Now if you'll excuse us, we have 24 more seconds per build to figure out what to do with.
