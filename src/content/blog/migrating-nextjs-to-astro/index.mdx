@@ -2,6 +2,7 @@
 title: 'Why We Migrated from Next.js to Astro (And What We Learned Along the Way)'
 description: 'Hard lessons learned about JavaScript hydration, First Load JS, and what "interactive" really means after migrating our stack from Next.js to Astro.'
 date: 2026-01-23
+image: './banner.png'
 tags: ['astro', 'nextjs', 'performance', 'migration']
 authors: ['sithumli-nanayakkara']
 ---
@@ -12,7 +13,7 @@ We finally did it. After months of staring at Lighthouse scores that made us que
 
 Let's be honest—our Next.js site wasn't terrible. It worked. It rendered. Users could click things. But every time we ran Lighthouse, we'd see numbers that felt... off. 230 KB of JavaScript for what was essentially a marketing site with some forms. 31-second build times that had us alt-tabbing to Twitter more than we'd like to admit.
 
-The thing that really got us was when a colleague asked: "Why does the pricing page need React to display static text?"
+The thing that really got us was when a friend asked: "Why does the pricing page need React to display static text?"
 
 We didn't have a good answer.
 
