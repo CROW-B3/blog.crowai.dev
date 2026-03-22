@@ -8,9 +8,9 @@ authors: ['thanuka-perera']
 draft: true
 ---
 
-There is a particular kind of madness that comes from staring at a browser console full of red text that reads `Access-Control-Allow-Origin`. It's the kind of madness that makes you question your career choices, your framework choices, and eventually — at 5:23 PM on a Friday — your choice to use cookies at all.
+There is a particular kind of madness that comes from staring at a browser console full of red text that reads `Access-Control-Allow-Origin`. It's the kind that makes you question your career, your framework choices, and eventually — at 5:23 PM on a Friday — your decision to use cookies at all.
 
-This is the story of how we built the CROW API gateway. More honestly, it's the story of how CORS, authentication, and the beautiful chaos of microservices conspired to humble us across 62 commits, 7 CORS rewrites, and one afternoon where we pushed 4 commits in 3 minutes, each one contradicting the last.
+This is the story of how we built the CROW API gateway. More honestly, it's the story of how CORS, authentication, and the beautiful chaos of microservices conspired to humble us across 62 commits, 7 CORS rewrites, and one afternoon where we pushed 4 commits in 3 minutes — each one contradicting the last.
 
 If you've ever whispered "just let me through" at a preflight request, this one's for you.
 
@@ -150,7 +150,7 @@ sequenceDiagram
     Note over Gateway: Raw Response bypasses Hono ✗
     Note over Gateway: Upstream CORS headers leak through ✗
     Gateway-->>Browser: Conflicting CORS headers
-    Note over Browser: 🔴 CORS ERROR
+    Note over Browser: CORS ERROR
 ```
 
 We had to make a decision: trust the framework, or take control ourselves.
@@ -222,7 +222,7 @@ One commit. Seven different problems solved. The kind of commit you write when t
 
 ## Interlude: The Auth Wars
 
-While CORS held center stage, authentication was waging its own quiet campaign of destruction behind the curtain. Allow me a brief digression, because the auth bugs and the CORS bugs were often indistinguishable from each other in the browser console.
+While CORS held center stage, authentication was waging its own quiet war behind the curtain. A brief digression — because in the browser console, auth bugs and CORS bugs are often indistinguishable.
 
 ### The Organization ID That Was Always Null
 
@@ -253,7 +253,7 @@ On February 2nd — the same day we expanded CORS origins — we committed a `.e
 
 Our `bff-chat-service` needed to call the gateway to fetch product and interaction data for AI tool calls. But it had no user session — it was a service, not a browser. The gateway rejected it.
 
-The fix: an `X-Internal-Key` header bypass. If you carry the internal key, you skip auth entirely. Simple, practical, and the kind of thing you only build after watching a service-to-service call fail in production.
+The fix: an `X-Internal-Key` header bypass. Carry the key, skip auth. The kind of thing you only build after watching a service-to-service call fail in production.
 
 ```mermaid
 flowchart LR
@@ -293,7 +293,7 @@ But these were paper cuts. The real wound was coming.
 
 ### March 21, 2026 — 5:23 PM Sri Lanka Time
 
-Something broke. We don't remember exactly what triggered it — some new client, some new subdomain, some request from some origin that wasn't in the list. What we remember is the feeling: the CORS errors returning like a tide, the origin list that was never complete, the growing certainty that we were playing whack-a-mole with infinity.
+Something broke. We don't remember exactly what triggered it — some new client, some new subdomain, some request from some origin that wasn't in the list. What we remember is the feeling: CORS errors returning like a tide, the origin list that was never complete, the growing certainty that we were playing whack-a-mole with infinity.
 
 What followed was four commits in three minutes. Each one a different philosophy. Each one deployed, tested, and abandoned in under sixty seconds.
 
@@ -357,8 +357,8 @@ Whatever origin the browser sends — echo it in `Access-Control-Allow-Origin`. 
 
 ```typescript
 export function createCorsMiddleware() {
-  // ⚠️ Reflected origin with credentials — ONLY safe for internal APIs
-  // where you control every client. External APIs MUST validate origins.
+  // WARNING: Reflected origin with credentials — only safe for internal APIs
+  // where you control every client. External APIs must validate origins.
   return async (c: Context, next: Next) => {
     const origin = c.req.header('Origin') || '*'
 
@@ -430,7 +430,7 @@ function extractAuthenticationToken(context, isApiKeyPassthrough) {
 
 Security and accessibility, forever in tension. You strip headers to prevent leaks, then carve exceptions for the services that need them. Every rule has its exception, and every exception has its edge case.
 
-## What We Learned (Written in Scar Tissue)
+## Key Learnings
 
 ### 1. Framework CORS helpers break with proxied responses
 
@@ -481,13 +481,13 @@ flowchart TB
     Q --> R[Response]
 ```
 
-It routes 16 services. It handles three auth strategies. It rate-limits at different tiers per route type. It caches with organization-scoped keys. And its CORS middleware is 23 lines of reflected-origin simplicity that hasn't needed a change since March 21st.
+It routes 16 services. It handles three auth strategies. It rate-limits at different tiers per route type. It caches with organization-scoped keys. And its CORS middleware is 23 lines of reflected-origin simplicity that hasn't needed a single change since March 21st.
 
-Sometimes the battle is the architecture.
+The gateway doesn't look like what we imagined on January 8th. It looks like what 62 commits of reality taught us. Sometimes the battle is the architecture.
 
 ---
 
-*Questions about our gateway setup? Battle scars from your own CORS wars? Check out our repos and come commiserate.*
+*Questions about our gateway setup or war stories from your own CORS battles? Check out our repos and feel free to open an issue.*
 
 ## Related Repositories
 
