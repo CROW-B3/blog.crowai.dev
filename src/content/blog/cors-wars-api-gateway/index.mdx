@@ -357,6 +357,8 @@ Whatever origin the browser sends — echo it in `Access-Control-Allow-Origin`. 
 
 ```typescript
 export function createCorsMiddleware() {
+  // ⚠️ Reflected origin with credentials — ONLY safe for internal APIs
+  // where you control every client. External APIs MUST validate origins.
   return async (c: Context, next: Next) => {
     const origin = c.req.header('Origin') || '*'
 
@@ -383,7 +385,9 @@ export function createCorsMiddleware() {
 
 No `env` parameter. No origin set. No list to maintain. Twenty-three lines that replaced 73 days of accumulating infrastructure.
 
-The `Vary: Origin` header tells caches that responses differ by origin — critical when you're reflecting, or you'll serve one origin's CORS headers to another. This is the detail that separates a reflected-origin implementation from a security vulnerability.
+> **A word on security:** Unvalidated reflected origin with `credentials: true` means *any* website can make authenticated cross-origin requests to your API. This is only acceptable because our gateway is an internal service — every client that talks to it is ours. If you're building a public-facing API, **do not do this**. Validate the origin against a trusted list (or a pattern like `*.yourdomain.com`) before reflecting it back. The reflected-origin pattern trades origin validation for operational simplicity. That trade only makes sense when you own both sides of the conversation.
+
+The `Vary: Origin` header tells caches that responses differ by origin — so a CDN or shared cache won't serve one client's CORS headers to another. This is about cache correctness, not security. The security boundary is whether you validate the origin before reflecting it. For us, the gateway sits behind Cloudflare's edge, every client is a `*.crowai.dev` subdomain we control, and the real authorization happens in the auth middleware — not in CORS.
 
 And note the fallback: `c.req.header('Origin') || '*'`. Non-browser requests (cURL, Postman, service-to-service) don't send an `Origin` header. For those, we fall back to wildcard, which is fine — they don't enforce CORS anyway.
 
@@ -436,9 +440,9 @@ If your gateway forwards requests, the framework's CORS middleware likely won't 
 
 `Access-Control-Allow-Origin: *` with `Access-Control-Allow-Credentials: true` is a browser spec violation. If you need cookies, you need a specific origin. We learned this twice in the same three minutes.
 
-### 3. Reflected origin is the endgame
+### 3. Reflected origin is the endgame — for internal APIs
 
-For internal gateways where you control all the clients, reflecting the `Origin` header back is the simplest correct solution. Set `Vary: Origin` so caches behave, and you're done. No list to maintain. No deployments to remember.
+For internal gateways where you control all the clients, reflecting the `Origin` header back is the simplest correct solution. **But only if you trust every possible caller.** For public APIs, validate the origin first — check it against a pattern like `*.yourdomain.com` — then reflect if trusted. Set `Vary: Origin` so caches don't cross-contaminate responses across origins. No list to maintain. No deployments to remember. Just make sure you understand the trust boundary you're operating in.
 
 ### 4. Auth bugs and CORS bugs look identical
 
